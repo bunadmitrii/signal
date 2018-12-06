@@ -1,0 +1,1 @@
+add_library(sound src/config.c src/sound.c)
