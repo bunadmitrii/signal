@@ -1,0 +1,1 @@
+add_library(net src/net.c src/connconfig.c)

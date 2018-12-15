@@ -4,9 +4,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(hello-c-vscode)
 
+include_directories("${PROJECT_SOURCE_DIR}/net/include")
+add_subdirectory(net)
+
 include_directories("${PROJECT_SOURCE_DIR}/sound/include")
 add_subdirectory(sound)
 
 add_executable(bin.out main.c)
 target_link_libraries(bin.out sound)
+target_link_libraries(bin.out net)
 target_link_libraries(bin.out asound)

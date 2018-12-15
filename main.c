@@ -5,6 +5,7 @@
 #define _POSIX_C_SOURCE 200809L
 #endif
 
+#include "net.h"
 #include "sound.h"
 #include <stdio.h>
 #include <string.h>
@@ -20,6 +21,8 @@ static const unsigned_frames_count period_size = 2048;
 static const unsigned int channels = 2;
 
 static void _print_usage_info_and_exit(const char *);
+//TODO: Compile command is not being used for vscode. Sometimes re-creating it by hands helps
+
 //!!!!!TODO:!!!!! How to force a compiler to emit warning in case a enumeration constant of one enum type is assigned to another?
 
 //TODO: Configure problem matcher. It does not navigate to the line with a problem in case of warning
@@ -32,6 +35,9 @@ static void _print_usage_info_and_exit(const char *);
 //TODO: Ctrl+B does not work properly when terminal focus is on
 int main(int argc, char const *argv[])
 {
+    struct connection_config_t config_ptr = {.type = local, .port = -1, .host = "/tmp/test_local_addr"};
+    connection * connection_ptr;
+    await_connection(&connection_ptr, &config_ptr);
     enum { record, play } mode;
     const char *device = NULL;
     const char *file_path = NULL;
