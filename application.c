@@ -27,9 +27,6 @@ int run_application(struct application_config_t app_config){
     const char *const file_path = app_config.file_path;
     const char *const device = app_config.device_name;
 
-    connection * connection_ptr = NULL;
-    await_connection(&connection_ptr, &(app_config.conn_config));
-
     sound_device_config_t *const cfg_ptr = config_allocate();
     set_rate(cfg_ptr, 44100);
     set_channels(cfg_ptr, channels);
@@ -43,25 +40,35 @@ int run_application(struct application_config_t app_config){
 
     switch(mode){
         case record: {
-            sound_device_input_t *input = open_input(device, cfg_ptr);
-            int fd = open(file_path, O_WRONLY | O_EXCL | O_CREAT, S_IRUSR);
-            if(fd <= 0){
-                if(errno == EEXIST){
-                    fprintf(stderr, "File %s already exists\n", file_path);
-                } else {
-                    fprintf(stderr, "Error while opening file %s. Error code: %d, error details: %s\n", file_path, errno, strerror(errno));
-                }
-                return 1;
-            }
             while(1){
-                unsigned_frames_count frames_captured = capture(input, buffer, period_size);
-                printf("Captured %lu frames. Writing to file...\n", frames_captured);
-                printf("Data captured: %s\n", buffer);
-                enum net_op_result result = send_data(connection_ptr, buffer, buffer_frames * frame_size);
-                if(result == data_transfer_error)
-                    fprintf(stderr, "Error occured while transferring data\n");
-                ssize_t written = write(fd, buffer, buffer_frames * frame_size);
-                printf("Written %ld bytes to file\n", written);
+                struct server_endpoint_t *srv_endpoint_ptr = NULL;
+                struct connection_t *connection_ptr = NULL;
+                initialize_server_endpoint(&srv_endpoint_ptr, &app_config.conn_config);
+                await_connection(srv_endpoint_ptr, &connection_ptr);
+
+                sound_device_input_t *input = open_input(device, cfg_ptr);
+                int fd = open(file_path, O_WRONLY | O_EXCL | O_CREAT, S_IRUSR);
+                if(fd <= 0){
+                    if(errno == EEXIST){
+                        fprintf(stderr, "File %s already exists\n", file_path);
+                    } else {
+                        fprintf(stderr, "Error while opening file %s. Error code: %d, error details: %s\n", file_path, errno, strerror(errno));
+                    }
+                    return 1;
+                }
+                enum net_op_result result = success;
+                while(result != data_transfer_error){
+                    unsigned_frames_count frames_captured = capture(input, buffer, period_size);
+                    printf("Captured %lu frames. Writing to file...\n", frames_captured);
+                    printf("Data captured: %s\n", buffer);
+                    result = send_data(connection_ptr, buffer, buffer_frames * frame_size);
+                    ssize_t written = write(fd, buffer, buffer_frames * frame_size);
+                    printf("Written %ld bytes to file\n", written);
+                }
+                fprintf(stderr, "Error occured while transferring data\n");
+                close_input(input);
+                //TODO: Currently closes both server and client endpoints. Separate and close only the client endpoint
+                close_connection(connection_ptr); 
             }
             break;
         }
@@ -83,7 +90,6 @@ int run_application(struct application_config_t app_config){
         }
     }
     free(buffer);
-    close_connection(connection_ptr); 
 
     return 0;
 }

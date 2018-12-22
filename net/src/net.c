@@ -17,17 +17,34 @@
 
 #include "net.h"
 
+struct _server_endpoint_internal{
+    const int server_sock_fd;
+    const uint32_t port;
+    const char *const hostname;
+};
+
+struct server_endpoint_t{
+    enum connection_type type;
+    struct _server_endpoint_internal endpoint;
+};
+
 struct connection_t{
-    const int sock_fd;
+    const struct server_endpoint_t srv_endpoint;
     const int peer_fd;
 };
 
-static enum net_op_result _await_local_connection(connection ** conn_ptr, struct connection_config_t *config_ptr);
+static struct server_endpoint_t* _craete_local_connection(struct connection_config_t *config_ptr);
+static enum net_op_result _close_local_connection(const struct server_endpoint_t, const int peer_fd);
 
-enum net_op_result await_connection(struct connection_t** connection_ptr, struct connection_config_t *config_ptr){
+enum net_op_result initialize_server_endpoint(struct server_endpoint_t **srv_endpoint_ptr, struct connection_config_t *config_ptr){
     switch(config_ptr -> type){
         case local: {
-            return _await_local_connection(connection_ptr, config_ptr);
+            struct server_endpoint_t *tmp = _craete_local_connection(config_ptr);
+            if(tmp != NULL){
+                *srv_endpoint_ptr = tmp;
+                return success;
+            } else 
+                return server_initialization_error;
         }
         default:
             fprintf(stderr, "Unknown type: %d\n", config_ptr -> type);
@@ -35,25 +52,40 @@ enum net_op_result await_connection(struct connection_t** connection_ptr, struct
     }
 }
 
-
-enum net_op_result close_connection(connection *conn_ptr){
-    printf("Closing peer file descriptor... ");
+enum net_op_result await_connection(const struct server_endpoint_t *srv_endpoint_ptr, connection** conn_ptr){
+    const int server_sock_fd = srv_endpoint_ptr -> endpoint.server_sock_fd;
+    struct sockaddr_un peer_address;
+    memset(&peer_address, '\0', sizeof(peer_address));
+    socklen_t peer_addrlen = 0;
+    printf("Waiting for local connection... ");
     fflush(stdout);
-    if(close(conn_ptr -> peer_fd) == -1){
-        fprintf(stderr, "\nCannot close peer file descriptor %d. Error code = %d, deatils = %s\n", conn_ptr -> peer_fd, errno, strerror(errno));
-        return connection_closing_error;
+    int peer_fd = accept(server_sock_fd, (struct sockaddr *) &peer_address, &peer_addrlen);
+    if(peer_fd == -1){
+        fprintf(stderr, "\nPeer connection error on server socker fd = %d. Error code = %d, details = %s\n", server_sock_fd, errno, strerror(errno));
+        return connection_establishment_error;
     }
     printf("OK.\n");
-
-    printf("Closing listening host socket... ");
-    fflush(stdout);
-    if(close(conn_ptr -> sock_fd) == -1){
-        fprintf(stderr, "\nCannot close host socket file descriptor %d. Error code = %d, details = %s\n", conn_ptr -> sock_fd, errno, strerror(errno));
-        return connection_closing_error;
-    }
-    printf("OK.\n");
+    struct connection_t tmp = {.srv_endpoint = *srv_endpoint_ptr, .peer_fd = peer_fd };
+    struct connection_t *ptr = malloc(sizeof(**conn_ptr));
+    memcpy(ptr, &tmp, sizeof(tmp));
+    *conn_ptr = ptr;
     return success;
 }
+
+enum net_op_result close_connection(struct connection_t *conn_ptr){
+    enum connection_type type = conn_ptr -> srv_endpoint.type;
+    switch(type){
+        case local: {
+            const struct server_endpoint_t srv_endpoint = conn_ptr -> srv_endpoint;
+            const int peer_fd = conn_ptr -> peer_fd;
+            return _close_local_connection(srv_endpoint, peer_fd);
+        }
+        default: 
+            fprintf(stderr, "Cannot close connection with unknown type %d\n", type);
+            return connection_closing_error;
+    }
+}
+
 
 enum net_op_result send_data(connection *conn_ptr, void *buf, size_t to_send){
     char *data = (char *) buf;
@@ -69,70 +101,74 @@ enum net_op_result send_data(connection *conn_ptr, void *buf, size_t to_send){
     return success;
 }
 
-static enum net_op_result _await_local_connection(struct connection_t ** conn_ptr, struct connection_config_t *config_ptr){
-    const char *sockname = config_ptr -> host;
-    const size_t sockname_len = strlen(sockname);
-    const size_t sun_path_len = sizeof(((struct sockaddr_un *) NULL) -> sun_path);
-    if(sockname_len > sun_path_len - 1){
-        fprintf(stderr, "The hostname exceeds maximum %lu character. Hostname = %s\n", sun_path_len, sockname);
-        return connection_establishment_error;
+//TODO: Exteranal linkage. Is it UB (previous one declared is static)
+struct server_endpoint_t* _craete_local_connection(struct connection_config_t *config_ptr){
+    const size_t sun_path_size = sizeof(((struct sockaddr_un*) NULL) -> sun_path);
+    const char *const hostname = config_ptr -> host;
+    const size_t hostname_len = strlen(hostname);
+
+    if(sun_path_size < hostname_len + 1){
+        fprintf(stderr, "Hostname %s is too long. Maximum allowed size is %lu", hostname, sun_path_size - 1);
+        return NULL;
     }
-    struct sockaddr_un server_address; 
-    memset(&server_address, '\0', sizeof(server_address));
-    server_address.sun_family = AF_LOCAL;
-    strncpy(server_address.sun_path, sockname, sockname_len);
-    
-    //TODO: Replace with strncpy
-    memcpy(&(server_address.sun_path), sockname, sockname_len + 1);
-    const socklen_t server_addrlen = offsetof(struct sockaddr_un, sun_path) + strlen(server_address.sun_path) + 1;
 
-    struct sockaddr_un peer_address;
-    memset(&peer_address, '\0', sizeof(peer_address));
-    socklen_t peer_addrlen = 0;
-
-    //TODO: Too many boilerplate with flushing and printing error messages.
-    printf("Creating socket... ");
+    printf("Creating socket for local communication... ");
     fflush(stdout);
-    //TODO: Currently protocol is set to 0 under assumption
-    //TODO: that the there is only a single protocol exists 
-    //TODO: within a given protocol family
     int sock_fd = socket(AF_LOCAL, SOCK_STREAM, 0);
     if(sock_fd == -1){
-        fprintf(stderr, "\nCannot create socket for local communication. Error code = %d. Details: %s\n", errno, strerror(errno));
-        return connection_establishment_error;
+        close(sock_fd);
+        fprintf(stderr, "\nUnable to create socker. Error code = %d, deatils: %s", errno, strerror(errno));
+        return NULL;
     }
     printf("OK.\n");
 
-    printf("Binding socket to address %s... ", server_address.sun_path);
+    struct sockaddr_un server_address;
+    memset(&server_address, '\0', sizeof(struct sockaddr_un));
+    server_address.sun_family = AF_LOCAL;
+    strncpy(server_address.sun_path, hostname, hostname_len + 1);
+    const socklen_t addrlen = offsetof(struct sockaddr_un, sun_path) + hostname_len + 1;
+
+    printf("Trying to bind socket %d to address %s... ", sock_fd, hostname);
     fflush(stdout);
-    int bind_result = bind(sock_fd, (struct sockaddr*) &server_address, server_addrlen);
+    int bind_result = bind(sock_fd, (struct sockaddr*) &server_address, addrlen);
     if(bind_result == -1){
-        fprintf(stderr, "\nCannot bind socket to local address %s. Error code = %d. Details: %s\n", server_address.sun_path, errno, strerror(errno));
-        return connection_establishment_error;
+        fprintf(stderr, "\nUnable to bind socket %d to address %s. Error code = %d, details = %s\n", sock_fd, hostname, errno, strerror(errno));
+        return NULL;
     }
     printf("OK.\n");
 
-    printf("Marking socket %d as a passive socket... ", sock_fd);
+    printf("Preparing to accept incoming connection on socket %d... ", sock_fd);
     fflush(stdout);
     int listen_result = listen(sock_fd, 0);
     if(listen_result == -1){
-        fprintf(stderr, "\nCannot mark socket with descriptor %d as a passive socket. Error code = %d. Details: %s\n", sock_fd, errno, strerror(errno));
-        return connection_establishment_error;
+        fprintf(stderr, "\nUnable to mark socket %d as a passive socket. Error code = %d, details = %s\n", sock_fd, errno, strerror(errno));
+        return NULL;
     }
     printf("OK.\n");
 
-    printf("Waiting for a connection... ");
-    fflush(stdout);
-    int peer_fd = accept(sock_fd, (struct sockaddr *)&peer_address, &peer_addrlen);
-    if(peer_fd == -1){
-        fprintf(stderr, "\nError when waiting for a connection. Error code = %d. Details: %s\n", errno, strerror(errno));
-        return connection_establishment_error;
-    }
-    printf("Connected\n");
+    struct server_endpoint_t tmp = {.endpoint = {.server_sock_fd = sock_fd, .hostname = hostname, .port = config_ptr -> port}, .type = local} ;
+    struct server_endpoint_t *srv_endpoint = calloc(1, sizeof(struct server_endpoint_t));
+    memcpy(srv_endpoint, &tmp, sizeof(tmp));
 
-    struct connection_t tmp = {.sock_fd = sock_fd, .peer_fd = peer_fd};
-    struct connection_t *connection_ptr = malloc(sizeof(struct connection_t));
-    memcpy(connection_ptr, &tmp, sizeof(tmp));
-    *conn_ptr = connection_ptr;
+    return srv_endpoint;
+}
+
+enum net_op_result _close_local_connection(const struct server_endpoint_t srv_endpoint, const int peer_fd){
+    printf("Closing peer file descriptor... ");
+    fflush(stdout);
+    if(close(peer_fd) == -1){
+        fprintf(stderr, "\nCannot close peer file descriptor %d. Error code = %d, deatils = %s\n", peer_fd, errno, strerror(errno));
+        return connection_closing_error;
+    }
+    printf("OK.\n");
+
+    printf("Closing listening host socket... ");
+    fflush(stdout);
+    if(close(srv_endpoint.endpoint.server_sock_fd) == -1){
+        fprintf(stderr, "\nCannot close host socket file descriptor %d. Error code = %d, details = %s\n", srv_endpoint.endpoint.server_sock_fd, errno, strerror(errno));
+        return connection_closing_error;
+    }
+    unlink(srv_endpoint.endpoint.hostname);
+    printf("OK.\n");
     return success;
 }
