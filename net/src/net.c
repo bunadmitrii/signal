@@ -17,15 +17,12 @@
 
 #include "net.h"
 
-struct _server_endpoint_internal{
-    const int server_sock_fd;
-    const uint32_t port;
-    const char *const hostname;
-};
+#include "internal/config_internal.h"
 
 struct server_endpoint_t{
-    enum connection_type type;
-    struct _server_endpoint_internal endpoint;
+    const enum connection_type type;
+    const int sock_fd;
+    const union conf_t conf;
 };
 
 struct connection_t{
@@ -33,13 +30,13 @@ struct connection_t{
     const int peer_fd;
 };
 
-static struct server_endpoint_t* _craete_local_connection(struct connection_config_t *config_ptr);
-static enum net_op_result _close_local_connection(const struct server_endpoint_t, const int peer_fd);
+static struct server_endpoint_t* _craete_local_endpoint(struct local_conf_t local_conf_ptr);
+static enum net_op_result _close_local_connection(const struct local_conf_t local_conf_ptr, int sock_fd, const int peer_fd);
 
 enum net_op_result initialize_server_endpoint(struct server_endpoint_t **srv_endpoint_ptr, struct connection_config_t *config_ptr){
     switch(config_ptr -> type){
         case local: {
-            struct server_endpoint_t *tmp = _craete_local_connection(config_ptr);
+            struct server_endpoint_t *tmp = _craete_local_endpoint(config_ptr -> conf.local_conf);
             if(tmp != NULL){
                 *srv_endpoint_ptr = tmp;
                 return success;
@@ -53,7 +50,7 @@ enum net_op_result initialize_server_endpoint(struct server_endpoint_t **srv_end
 }
 
 enum net_op_result await_connection(const struct server_endpoint_t *srv_endpoint_ptr, connection** conn_ptr){
-    const int server_sock_fd = srv_endpoint_ptr -> endpoint.server_sock_fd;
+    const int server_sock_fd = srv_endpoint_ptr -> sock_fd;
     struct sockaddr_un peer_address;
     memset(&peer_address, '\0', sizeof(peer_address));
     socklen_t peer_addrlen = 0;
@@ -77,8 +74,9 @@ enum net_op_result close_connection(struct connection_t *conn_ptr){
     switch(type){
         case local: {
             const struct server_endpoint_t srv_endpoint = conn_ptr -> srv_endpoint;
+            const int sock_fd = conn_ptr -> srv_endpoint.sock_fd;
             const int peer_fd = conn_ptr -> peer_fd;
-            return _close_local_connection(srv_endpoint, peer_fd);
+            return _close_local_connection(srv_endpoint.conf.local_conf, sock_fd, peer_fd);
         }
         default: 
             fprintf(stderr, "Cannot close connection with unknown type %d\n", type);
@@ -102,9 +100,9 @@ enum net_op_result send_data(connection *conn_ptr, void *buf, size_t to_send){
 }
 
 //TODO: Exteranal linkage. Is it UB (previous one declared is static)
-struct server_endpoint_t* _craete_local_connection(struct connection_config_t *config_ptr){
+struct server_endpoint_t* _craete_local_endpoint(struct local_conf_t local_conf){
     const size_t sun_path_size = sizeof(((struct sockaddr_un*) NULL) -> sun_path);
-    const char *const hostname = config_ptr -> host;
+    const char *const hostname = local_conf.local_address;
     const size_t hostname_len = strlen(hostname);
 
     if(sun_path_size < hostname_len + 1){
@@ -146,14 +144,19 @@ struct server_endpoint_t* _craete_local_connection(struct connection_config_t *c
     }
     printf("OK.\n");
 
-    struct server_endpoint_t tmp = {.endpoint = {.server_sock_fd = sock_fd, .hostname = hostname, .port = config_ptr -> port}, .type = local} ;
+    struct server_endpoint_t tmp = {
+        .type = local,
+        .sock_fd = sock_fd,
+        .conf = {local_conf}
+    };
     struct server_endpoint_t *srv_endpoint = calloc(1, sizeof(struct server_endpoint_t));
     memcpy(srv_endpoint, &tmp, sizeof(tmp));
 
     return srv_endpoint;
 }
 
-enum net_op_result _close_local_connection(const struct server_endpoint_t srv_endpoint, const int peer_fd){
+
+static enum net_op_result _close_local_connection(const struct local_conf_t local_conf_ptr, int sock_fd, const int peer_fd){
     printf("Closing peer file descriptor... ");
     fflush(stdout);
     if(close(peer_fd) == -1){
@@ -164,11 +167,11 @@ enum net_op_result _close_local_connection(const struct server_endpoint_t srv_en
 
     printf("Closing listening host socket... ");
     fflush(stdout);
-    if(close(srv_endpoint.endpoint.server_sock_fd) == -1){
-        fprintf(stderr, "\nCannot close host socket file descriptor %d. Error code = %d, details = %s\n", srv_endpoint.endpoint.server_sock_fd, errno, strerror(errno));
+    if(close(sock_fd) == -1){
+        fprintf(stderr, "\nCannot close host socket file descriptor %d. Error code = %d, details = %s\n", sock_fd, errno, strerror(errno));
         return connection_closing_error;
     }
-    unlink(srv_endpoint.endpoint.hostname);
+    unlink(local_conf_ptr.local_address);
     printf("OK.\n");
     return success;
 }

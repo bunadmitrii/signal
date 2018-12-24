@@ -2,18 +2,15 @@
 #define CONNCONFIG_H
 #include <stdint.h>
 
-enum connection_type{
-    local,
-    tcp
-};
+/**
+ * Platform-specific format of the local address. 
+ * 
+ * On unix-like systems it's supposed to be a valid filesystem
+ * path of a domain socket to be created.
+ */
+struct connection_config_t *allocate_local(const char *local_address);
 
-struct connection_config_t{
-    const enum connection_type type;
-    const uint32_t port;
-    const char * const host;
-};
-
-struct connection_config_t *allocate_config(enum connection_type, const uint32_t port, const char *host);
+struct connection_config_t *allocate_tcp(const char *hostname, uint32_t port);
 
 void release_config(struct connection_config_t *);
 

@@ -43,7 +43,7 @@ int run_application(struct application_config_t app_config){
             while(1){
                 struct server_endpoint_t *srv_endpoint_ptr = NULL;
                 struct connection_t *connection_ptr = NULL;
-                initialize_server_endpoint(&srv_endpoint_ptr, &app_config.conn_config);
+                initialize_server_endpoint(&srv_endpoint_ptr, app_config.conn_config_ptr);
                 await_connection(srv_endpoint_ptr, &connection_ptr);
 
                 sound_device_input_t *input = open_input(device, cfg_ptr);
