@@ -25,13 +25,12 @@ struct server_endpoint_t{
     const union conf_t conf;
 };
 
-struct connection_t{
-    const struct server_endpoint_t srv_endpoint;
+struct client_enpoint_t{
     const int peer_fd;
 };
 
 static struct server_endpoint_t* _craete_local_endpoint(struct local_conf_t local_conf_ptr);
-static enum net_op_result _close_local_connection(const struct local_conf_t local_conf_ptr, int sock_fd, const int peer_fd);
+static enum net_op_result _close_local_endpoint(const struct local_conf_t, int);
 
 enum net_op_result initialize_server_endpoint(struct server_endpoint_t **srv_endpoint_ptr, struct connection_config_t *config_ptr){
     switch(config_ptr -> type){
@@ -49,6 +48,19 @@ enum net_op_result initialize_server_endpoint(struct server_endpoint_t **srv_end
     }
 }
 
+enum net_op_result release_server_endpoing(const struct server_endpoint_t *srv_endpoint_ptr){
+    enum connection_type type = srv_endpoint_ptr -> type;
+    switch(type){
+        case local: {
+            const int sock_fd = srv_endpoint_ptr -> sock_fd;
+            return _close_local_endpoint(srv_endpoint_ptr -> conf.local_conf, sock_fd);
+        }
+        default: 
+            fprintf(stderr, "Cannot close connection with unknown type %d\n", type);
+            return connection_closing_error;
+    }
+}
+
 enum net_op_result await_connection(const struct server_endpoint_t *srv_endpoint_ptr, connection** conn_ptr){
     const int server_sock_fd = srv_endpoint_ptr -> sock_fd;
     struct sockaddr_un peer_address;
@@ -62,32 +74,30 @@ enum net_op_result await_connection(const struct server_endpoint_t *srv_endpoint
         return connection_establishment_error;
     }
     printf("OK.\n");
-    struct connection_t tmp = {.srv_endpoint = *srv_endpoint_ptr, .peer_fd = peer_fd };
+    struct client_enpoint_t *client_endpoint_ptr = malloc(sizeof(*client_endpoint_ptr));
+    memcpy(client_endpoint_ptr, &peer_fd, sizeof(*client_endpoint_ptr));
+    struct connection_t tmp = {.srv_endpoint_ptr = srv_endpoint_ptr, .client_endpoint_ptr = client_endpoint_ptr};
     struct connection_t *ptr = malloc(sizeof(**conn_ptr));
     memcpy(ptr, &tmp, sizeof(tmp));
     *conn_ptr = ptr;
     return success;
 }
 
-enum net_op_result close_connection(struct connection_t *conn_ptr){
-    enum connection_type type = conn_ptr -> srv_endpoint.type;
-    switch(type){
-        case local: {
-            const struct server_endpoint_t srv_endpoint = conn_ptr -> srv_endpoint;
-            const int sock_fd = conn_ptr -> srv_endpoint.sock_fd;
-            const int peer_fd = conn_ptr -> peer_fd;
-            return _close_local_connection(srv_endpoint.conf.local_conf, sock_fd, peer_fd);
-        }
-        default: 
-            fprintf(stderr, "Cannot close connection with unknown type %d\n", type);
-            return connection_closing_error;
+enum net_op_result close_client_endpoint(const struct client_enpoint_t* client_endpoint_ptr){
+    printf("Closing peer file descriptor... ");
+    fflush(stdout);
+    int peer_fd = client_endpoint_ptr -> peer_fd;
+    if(close(peer_fd) == -1){
+        fprintf(stderr, "\nCannot close peer file descriptor %d. Error code = %d, deatils = %s\n", peer_fd, errno, strerror(errno));
+        return connection_closing_error;
     }
+    printf("OK.\n");
+    return success;
 }
-
 
 enum net_op_result send_data(connection *conn_ptr, void *buf, size_t to_send){
     char *data = (char *) buf;
-    const int peer_fd = conn_ptr -> peer_fd;
+    const int peer_fd = conn_ptr -> client_endpoint_ptr -> peer_fd;
     ssize_t written = write(peer_fd, data, to_send);
     while (written > 0){
         written = write(peer_fd, data + written, to_send - written);
@@ -155,23 +165,23 @@ struct server_endpoint_t* _craete_local_endpoint(struct local_conf_t local_conf)
     return srv_endpoint;
 }
 
-
-static enum net_op_result _close_local_connection(const struct local_conf_t local_conf_ptr, int sock_fd, const int peer_fd){
-    printf("Closing peer file descriptor... ");
-    fflush(stdout);
-    if(close(peer_fd) == -1){
-        fprintf(stderr, "\nCannot close peer file descriptor %d. Error code = %d, deatils = %s\n", peer_fd, errno, strerror(errno));
-        return connection_closing_error;
-    }
-    printf("OK.\n");
-
-    printf("Closing listening host socket... ");
+static enum net_op_result _close_local_endpoint(const struct local_conf_t local_conf_ptr, int sock_fd){
+    const char *const local_address = local_conf_ptr.local_address;
+    printf("Closing local endpoint... ");
     fflush(stdout);
     if(close(sock_fd) == -1){
-        fprintf(stderr, "\nCannot close host socket file descriptor %d. Error code = %d, details = %s\n", sock_fd, errno, strerror(errno));
+        fprintf(stderr, "\nCannot close local socket file descriptor %d. Error code = %d, details = %s\n", sock_fd, errno, strerror(errno));
         return connection_closing_error;
     }
-    unlink(local_conf_ptr.local_address);
     printf("OK.\n");
+
+    printf("Unlinkind local socket... ");
+    fflush(stdout);
+    if(unlink(local_address) == -1){
+        fprintf(stderr, "\nCannot unlink local socket %s. Error code = %d, details = %s\n", local_address, errno, strerror(errno));
+        return connection_closing_error;
+    }
+    printf("OK\n");
+
     return success;
 }

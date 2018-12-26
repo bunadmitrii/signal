@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 2.8)
+project(hello-c-vscode)
+
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_FLAGS "-Wall -Wshadow -Wextra -pedantic")
-
-project(hello-c-vscode)
 
 include_directories("${PROJECT_SOURCE_DIR}/net/include")
 add_subdirectory(net)

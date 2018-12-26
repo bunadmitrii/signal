@@ -40,10 +40,10 @@ int run_application(struct application_config_t app_config){
 
     switch(mode){
         case record: {
+            struct server_endpoint_t *srv_endpoint_ptr = NULL;
+            struct connection_t *connection_ptr = NULL;
+            initialize_server_endpoint(&srv_endpoint_ptr, app_config.conn_config_ptr);
             while(1){
-                struct server_endpoint_t *srv_endpoint_ptr = NULL;
-                struct connection_t *connection_ptr = NULL;
-                initialize_server_endpoint(&srv_endpoint_ptr, app_config.conn_config_ptr);
                 await_connection(srv_endpoint_ptr, &connection_ptr);
 
                 sound_device_input_t *input = open_input(device, cfg_ptr);
@@ -68,7 +68,8 @@ int run_application(struct application_config_t app_config){
                 fprintf(stderr, "Error occured while transferring data\n");
                 close_input(input);
                 //TODO: Currently closes both server and client endpoints. Separate and close only the client endpoint
-                close_connection(connection_ptr); 
+                close_client_endpoint(connection_ptr -> client_endpoint_ptr); 
+                // release_server_endpoing(connection_ptr -> srv_endpoint_ptr); 
             }
             break;
         }
