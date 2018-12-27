@@ -27,4 +27,14 @@ struct connection_config_t{
     const union conf_t conf;
 };
 
+struct server_endpoint_t{
+    const enum connection_type type;
+    const int sock_fd;
+    const union conf_t conf;
+};
+
+struct client_enpoint_t{
+    const int peer_fd;
+};
+
 #endif //NET_CONFIG_INTERNAL_H

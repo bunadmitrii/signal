@@ -1,1 +1,1 @@
-add_library(net src/net.c src/connconfig.c)
+add_library(net src/net.c src/connconfig.c src/internal/server_endpoint.c)
