@@ -49,7 +49,7 @@ enum net_op_result release_server_endpoing(const struct server_endpoint_t *srv_e
     }
 }
 
-enum net_op_result await_connection(const struct server_endpoint_t *srv_endpoint_ptr, connection** conn_ptr){
+enum net_op_result await_connection(const struct server_endpoint_t *srv_endpoint_ptr, struct connection_t** conn_ptr){
     const int server_sock_fd = srv_endpoint_ptr -> sock_fd;
     struct sockaddr_un peer_address;
     memset(&peer_address, '\0', sizeof(peer_address));
@@ -83,7 +83,7 @@ enum net_op_result close_client_endpoint(const struct client_enpoint_t* client_e
     return success;
 }
 
-enum net_op_result send_data(connection *conn_ptr, void *buf, size_t to_send){
+enum net_op_result send_data(struct connection_t *conn_ptr, void *buf, size_t to_send){
     char *data = (char *) buf;
     const int peer_fd = conn_ptr -> client_endpoint_ptr -> peer_fd;
     ssize_t written = write(peer_fd, data, to_send);

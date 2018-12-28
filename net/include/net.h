@@ -7,14 +7,14 @@
 #include "connection.h"
 #include "op_result.h"
 
-enum net_op_result initialize_server_endpoint(server_endpoint **, struct connection_config_t *config_ptr);
+enum net_op_result initialize_server_endpoint(struct server_endpoint_t**, struct connection_config_t *config_ptr);
 
-enum net_op_result release_server_endpoing(const struct server_endpoint_t *);
+enum net_op_result release_server_endpoing(const struct server_endpoint_t*);
 
-enum net_op_result await_connection(const server_endpoint*, connection**);
+enum net_op_result await_connection(const struct server_endpoint_t*, struct connection_t**);
 
 enum net_op_result close_client_endpoint(const struct client_enpoint_t *);
 
-enum net_op_result send_data(connection *, void *, size_t);
+enum net_op_result send_data(struct connection_t*, void *, size_t);
 
 #endif //NET_H

@@ -1,13 +1,13 @@
 #ifndef NET_TYPES_H
 #define NET_TYPES_H
 
-typedef struct server_endpoint_t server_endpoint;
+struct server_endpoint_t;
 
-typedef struct client_enpoint_t client_endpoint;
+struct client_enpoint_t;
 
-typedef struct connection_t {
+struct connection_t {
     const struct server_endpoint_t *srv_endpoint_ptr;
     const struct client_enpoint_t *client_endpoint_ptr;
-} connection;
+};
 
 #endif //NET_TYPES_H
