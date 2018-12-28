@@ -42,36 +42,39 @@ int run_application(struct application_config_t app_config){
         case record: {
             struct server_endpoint_t *srv_endpoint_ptr = NULL;
             struct connection_t *connection_ptr = NULL;
-            initialize_server_endpoint(&srv_endpoint_ptr, app_config.conn_config_ptr);
-            while(1){
-                await_connection(srv_endpoint_ptr, &connection_ptr);
+            enum net_op_result server_initialization_result = initialize_server_endpoint(&srv_endpoint_ptr, app_config.conn_config_ptr);
+            if(server_initialization_result == success){
+                while(1){
+                    await_connection(srv_endpoint_ptr, &connection_ptr);
 
-                sound_device_input_t *input = open_input(device, cfg_ptr);
-                int fd = open(file_path, O_WRONLY | O_EXCL | O_CREAT, S_IRUSR);
-                if(fd <= 0){
-                    if(errno == EEXIST){
-                        fprintf(stderr, "File %s already exists\n", file_path);
-                    } else {
-                        fprintf(stderr, "Error while opening file %s. Error code: %d, error details: %s\n", file_path, errno, strerror(errno));
+                    sound_device_input_t *input = open_input(device, cfg_ptr);
+                    int fd = open(file_path, O_WRONLY | O_EXCL | O_CREAT, S_IRUSR);
+                    if(fd <= 0){
+                        if(errno == EEXIST){
+                            fprintf(stderr, "File %s already exists\n", file_path);
+                        } else {
+                            fprintf(stderr, "Error while opening file %s. Error code: %d, error details: %s\n", file_path, errno, strerror(errno));
+                        }
+                        return 1;
                     }
-                    return 1;
+                    enum net_op_result result = success;
+                    while(result != data_transfer_error){
+                        unsigned_frames_count frames_captured = capture(input, buffer, period_size);
+                        printf("Captured %lu frames. Writing to file...\n", frames_captured);
+                        printf("Data captured: %s\n", buffer);
+                        result = send_data(connection_ptr, buffer, buffer_frames * frame_size);
+                        ssize_t written = write(fd, buffer, buffer_frames * frame_size);
+                        printf("Written %ld bytes to file\n", written);
+                    }
+                    fprintf(stderr, "Error occured while transferring data\n");
+                    close_input(input);
+                    //TODO: Currently closes both server and client endpoints. Separate and close only the client endpoint
+                    close_client_endpoint(connection_ptr -> client_endpoint_ptr); 
+                    // release_server_endpoing(connection_ptr -> srv_endpoint_ptr); 
                 }
-                enum net_op_result result = success;
-                while(result != data_transfer_error){
-                    unsigned_frames_count frames_captured = capture(input, buffer, period_size);
-                    printf("Captured %lu frames. Writing to file...\n", frames_captured);
-                    printf("Data captured: %s\n", buffer);
-                    result = send_data(connection_ptr, buffer, buffer_frames * frame_size);
-                    ssize_t written = write(fd, buffer, buffer_frames * frame_size);
-                    printf("Written %ld bytes to file\n", written);
-                }
-                fprintf(stderr, "Error occured while transferring data\n");
-                close_input(input);
-                //TODO: Currently closes both server and client endpoints. Separate and close only the client endpoint
-                close_client_endpoint(connection_ptr -> client_endpoint_ptr); 
-                // release_server_endpoing(connection_ptr -> srv_endpoint_ptr); 
-            }
-            break;
+                break;
+            } else 
+                return 1;
         }
         case play: {
             int fd = open(file_path, O_RDONLY);
