@@ -5,6 +5,7 @@
 
 #include "connconfig.h"
 #include "connection.h"
+#include "op_result.h"
 
 enum net_op_result initialize_server_endpoint(server_endpoint **, struct connection_config_t *config_ptr);
 
