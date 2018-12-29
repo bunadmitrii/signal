@@ -10,6 +10,7 @@
 #include <errno.h>
 
 #include "server_endpoint.h"
+#include "util.h"
 
 struct server_endpoint_t* _craete_local_endpoint(struct local_conf_t local_conf){
     const size_t sun_path_size = sizeof(((struct sockaddr_un*) NULL) -> sun_path);

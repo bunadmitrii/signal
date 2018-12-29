@@ -20,7 +20,7 @@
 #include "internal/config_internal.h"
 #include "internal/server_endpoint.h"
 
-enum net_op_result initialize_server_endpoint(struct server_endpoint_t **srv_endpoint_ptr, struct connection_config_t *config_ptr){
+enum net_op_result initialize_server_endpoint(struct server_endpoint_t **srv_endpoint_ptr, struct connection_config_t *config_ptr, struct error_t **thrown){
     switch(config_ptr -> type){
         case local: {
             struct server_endpoint_t *tmp = _craete_local_endpoint(config_ptr -> conf.local_conf);
@@ -36,7 +36,7 @@ enum net_op_result initialize_server_endpoint(struct server_endpoint_t **srv_end
     }
 }
 
-enum net_op_result release_server_endpoing(const struct server_endpoint_t *srv_endpoint_ptr){
+enum net_op_result release_server_endpoing(const struct server_endpoint_t *srv_endpoint_ptr, struct error_t **thrown){
     enum connection_type type = srv_endpoint_ptr -> type;
     switch(type){
         case local: {
@@ -49,7 +49,7 @@ enum net_op_result release_server_endpoing(const struct server_endpoint_t *srv_e
     }
 }
 
-enum net_op_result await_connection(const struct server_endpoint_t *srv_endpoint_ptr, struct connection_t** conn_ptr){
+enum net_op_result await_connection(const struct server_endpoint_t *srv_endpoint_ptr, struct connection_t** conn_ptr, struct error_t **thrown){
     const int server_sock_fd = srv_endpoint_ptr -> sock_fd;
     struct sockaddr_un peer_address;
     memset(&peer_address, '\0', sizeof(peer_address));
@@ -71,7 +71,7 @@ enum net_op_result await_connection(const struct server_endpoint_t *srv_endpoint
     return success;
 }
 
-enum net_op_result close_client_endpoint(const struct client_enpoint_t* client_endpoint_ptr){
+enum net_op_result close_client_endpoint(const struct client_enpoint_t* client_endpoint_ptr, struct error_t **thrown){
     printf("Closing peer file descriptor... ");
     fflush(stdout);
     int peer_fd = client_endpoint_ptr -> peer_fd;
@@ -83,7 +83,7 @@ enum net_op_result close_client_endpoint(const struct client_enpoint_t* client_e
     return success;
 }
 
-enum net_op_result send_data(struct connection_t *conn_ptr, void *buf, size_t to_send){
+enum net_op_result send_data(struct connection_t *conn_ptr, void *buf, size_t to_send, struct error_t **thrown){
     char *data = (char *) buf;
     const int peer_fd = conn_ptr -> client_endpoint_ptr -> peer_fd;
     ssize_t written = write(peer_fd, data, to_send);

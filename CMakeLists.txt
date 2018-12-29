@@ -6,6 +6,8 @@ set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_FLAGS "-Wall -Wshadow -Wextra -pedantic")
 
+include_directories("${PROJECT_SOURCE_DIR}/util/include")
+
 include_directories("${PROJECT_SOURCE_DIR}/net/include")
 add_subdirectory(net)
 
