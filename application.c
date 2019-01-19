@@ -43,12 +43,10 @@ int run_application(struct application_config_t app_config){
 
     switch(mode){
         case record: {
-            struct server_endpoint_t *srv_endpoint_ptr = NULL;
-            struct connection_t *connection_ptr = NULL;
-            enum net_op_result server_initialization_result = initialize_server_endpoint(&srv_endpoint_ptr, app_config.conn_config_ptr, &error);
-            if(server_initialization_result == success){
+            struct server_endpoint_t *srv_endpoint_ptr = initialize_server_endpoint(app_config.conn_config_ptr, &error);
+            if(error == NULL){
                 while(1){
-                    await_connection(srv_endpoint_ptr, &connection_ptr, &error);
+                    struct connection_t *connection_ptr = await_connection(srv_endpoint_ptr, &error);
 
                     sound_device_input_t *input = open_input(device, cfg_ptr);
                     int fd = open(file_path, O_WRONLY | O_EXCL | O_CREAT, S_IRUSR);
@@ -60,24 +58,26 @@ int run_application(struct application_config_t app_config){
                         }
                         return 1;
                     }
-                    enum net_op_result result = success;
-                    while(result != data_transfer_error){
+                    //TODO: Currently error is not set. This may cause application to work incorrectly
+                    while(error == NULL){
                         unsigned_frames_count frames_captured = capture(input, buffer, period_size);
                         printf("Captured %lu frames. Writing to file...\n", frames_captured);
                         printf("Data captured: %s\n", buffer);
-                        result = send_data(connection_ptr, buffer, buffer_frames * frame_size, &error);
+                        send_data(connection_ptr, buffer, buffer_frames * frame_size, &error);
                         ssize_t written = write(fd, buffer, buffer_frames * frame_size);
                         printf("Written %ld bytes to file\n", written);
                     }
                     fprintf(stderr, "Error occured while transferring data\n");
+                    print_error_msg(error, stderr);
                     close_input(input);
-                    //TODO: Currently closes both server and client endpoints. Separate and close only the client endpoint
                     close_client_endpoint(connection_ptr -> client_endpoint_ptr, &error); 
-                    // release_server_endpoing(connection_ptr -> srv_endpoint_ptr); 
+                    clear_error(&error);
                 }
                 break;
-            } else 
+            } else {
+                print_error_msg(error, stderr);
                 return 1;
+            }
         }
         case play: {
             int fd = open(file_path, O_RDONLY);
