@@ -13,7 +13,7 @@
 #include "util.h"
 #include "net.h"
 
-struct server_endpoint_t* _create_local_endpoint(struct local_conf_t local_conf, struct error_t** thrown){
+struct server_endpoint_t* create_local_endpoint_(struct local_conf_t local_conf, struct error_t** thrown){
     const size_t sun_path_size = sizeof(((struct sockaddr_un*) NULL) -> sun_path);
     const char *const hostname = local_conf.local_address;
     const size_t hostname_len = strlen(hostname);
@@ -68,7 +68,7 @@ struct server_endpoint_t* _create_local_endpoint(struct local_conf_t local_conf,
     return srv_endpoint;
 }
 
-void _close_local_endpoint(const struct local_conf_t local_conf_ptr, int sock_fd, struct error_t** thrown){
+void close_local_endpoint_(const struct local_conf_t local_conf_ptr, int sock_fd, struct error_t** thrown){
     const char *const local_address = local_conf_ptr.local_address;
     printf("Closing local endpoint... ");
     fflush(stdout);

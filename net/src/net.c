@@ -24,7 +24,7 @@
 struct server_endpoint_t* initialize_server_endpoint(struct connection_config_t *config_ptr, struct error_t **thrown){
     switch(config_ptr -> type){
         case local:
-            return _create_local_endpoint(config_ptr -> conf.local_conf, thrown);
+            return create_local_endpoint_(config_ptr -> conf.local_conf, thrown);
         default: {
             ERROR_SET(thrown, server_initialization_error, "Unknown type %d", config_ptr -> type);
             return NULL;
@@ -37,7 +37,7 @@ void release_server_endpoing(const struct server_endpoint_t *srv_endpoint_ptr, s
     switch(type){
         case local: {
             const int sock_fd = srv_endpoint_ptr -> sock_fd;
-            _close_local_endpoint(srv_endpoint_ptr -> conf.local_conf, sock_fd, thrown);
+            close_local_endpoint_(srv_endpoint_ptr -> conf.local_conf, sock_fd, thrown);
             return;
         }
         default: 
