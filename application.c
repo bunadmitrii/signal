@@ -50,6 +50,7 @@ int run_application(struct application_config_t app_config){
 
                     sound_device_input_t *input = open_input(device, cfg_ptr);
                     int fd = open(file_path, O_WRONLY | O_EXCL | O_CREAT, S_IRUSR);
+                    //TODO: We should release all the resources properly in case the file cannot be opened
                     if(fd <= 0){
                         if(errno == EEXIST){
                             fprintf(stderr, "File %s already exists\n", file_path);

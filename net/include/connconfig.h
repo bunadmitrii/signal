@@ -10,7 +10,7 @@
  */
 struct connection_config_t *allocate_local(const char *local_address);
 
-struct connection_config_t *allocate_tcp(const char *hostname, uint32_t port);
+struct connection_config_t *allocate_tcp(const char *hostname, uint16_t port, int backlog);
 
 void release_config(struct connection_config_t *);
 

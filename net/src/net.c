@@ -19,12 +19,15 @@
 #include "util.h"
 
 #include "internal/config_internal.h"
-#include "internal/server_endpoint.h"
+#include "internal/tcp_endpoint.h"
+#include "internal/local_endpoint.h"
 
 struct server_endpoint_t* initialize_server_endpoint(struct connection_config_t *config_ptr, struct error_t **thrown){
     switch(config_ptr -> type){
         case local:
             return create_local_endpoint_(config_ptr -> conf.local_conf, thrown);
+        case tcp:
+            return create_tcp_endpoint_(config_ptr -> conf.tcp_conf, thrown);
         default: {
             ERROR_SET(thrown, server_initialization_error, "Unknown type %d", config_ptr -> type);
             return NULL;
@@ -40,6 +43,10 @@ void release_server_endpoing(const struct server_endpoint_t *srv_endpoint_ptr, s
             close_local_endpoint_(srv_endpoint_ptr -> conf.local_conf, sock_fd, thrown);
             return;
         }
+        case tcp : {
+            close_tcp_endpoint_(*srv_endpoint_ptr, thrown);
+            return;
+        }
         default: 
             ERROR_SET(thrown, closing_server_error, "Cannot close connection with unknown type %d", type);
     }
@@ -50,7 +57,14 @@ struct connection_t* await_connection(const struct server_endpoint_t *srv_endpoi
     struct sockaddr_un peer_address;
     memset(&peer_address, '\0', sizeof(peer_address));
     socklen_t peer_addrlen = 0;
-    printf("Waiting for local connection... ");
+    const char* connection_type_str; 
+    if(srv_endpoint_ptr -> type == local)
+        connection_type_str = "local";
+    else if(srv_endpoint_ptr -> type == tcp)
+        connection_type_str = "tcp";
+    else 
+        connection_type_str = "__UNKNOWN_CONNECTION_TYPE__";
+    printf("Waiting for %s connection... ", connection_type_str);
     fflush(stdout);
     int peer_fd = accept(server_sock_fd, (struct sockaddr *) &peer_address, &peer_addrlen);
     if(peer_fd == -1){

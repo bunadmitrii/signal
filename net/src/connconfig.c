@@ -18,13 +18,14 @@ struct connection_config_t *allocate_local(const char *local_address){
     return ptr;
 }
 
-struct connection_config_t *allocate_tcp(const char *hostname, uint32_t port){
+struct connection_config_t *allocate_tcp(const char *hostname, uint16_t port, int backlog){
     struct connection_config_t tmp = {
         .type = tcp, 
         .conf = {
             .tcp_conf = {
                 .hostname = hostname, 
-                .port = port
+                .port = port,
+                .backlog = backlog
             }
         }
     };

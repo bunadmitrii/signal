@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <errno.h>
 
-#include "server_endpoint.h"
+#include "local_endpoint.h"
 #include "util.h"
 #include "net.h"
 

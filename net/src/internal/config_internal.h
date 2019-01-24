@@ -14,7 +14,8 @@ struct local_conf_t{
 
 struct tcp_conf_t{
     const char *const hostname;
-    const uint32_t port;
+    const uint16_t port;
+    const int backlog;
 };
 
 union conf_t{
