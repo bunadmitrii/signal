@@ -48,7 +48,7 @@ int run_application(struct application_config_t app_config){
                 while(1){
                     struct connection_t *connection_ptr = await_connection(srv_endpoint_ptr, &error);
 
-                    sound_device_input_t *input = open_input(device, cfg_ptr);
+                    struct sound_device_input_t *input = open_input(device, cfg_ptr);
                     int fd = open(file_path, O_WRONLY | O_EXCL | O_CREAT, S_IRUSR);
                     //TODO: We should release all the resources properly in case the file cannot be opened
                     if(fd <= 0){
@@ -86,7 +86,7 @@ int run_application(struct application_config_t app_config){
                 fprintf(stderr, "Error while opening %s. Error code: %d, details: %s\n", file_path, errno, strerror(errno));
                 return 1;
             }
-            sound_device_output_t *output = open_output(device, cfg_ptr);
+            struct sound_device_output_t *output = open_output(device, cfg_ptr);
             ssize_t bytes_read = read(fd, buffer, buffer_frames * frame_size);
             while(bytes_read > 0){
                 printf("Bytes read from %s: %ld\n", file_path, bytes_read);

@@ -6,8 +6,8 @@
 #include "internal/types.h"
 
 enum mode {
-    _capture,
-    _playback
+    capture_,
+    playback_
 };
 
 struct sound_device_input_t{
@@ -21,16 +21,16 @@ struct sound_device_output_t{
 static void _configure_device(snd_pcm_t **pcm_handle_ptr, const char *sd, enum mode mode, sound_device_config_t* cfg);
 
 //capture
-sound_device_input_t *open_input(const char* sd, sound_device_config_t* sd_cfg){
+struct sound_device_input_t *open_input(const char* sd, sound_device_config_t* sd_cfg){
     snd_pcm_t *pcm_handle;
-    _configure_device(&pcm_handle, sd, _capture, sd_cfg);
-    sound_device_input_t *sdi = malloc(sizeof(*sdi));
-    sound_device_input_t tmp = {.pcm_handle = pcm_handle};
-    memcpy(sdi, &tmp, sizeof(&tmp));
+    _configure_device(&pcm_handle, sd, capture_, sd_cfg);
+    struct sound_device_input_t *sdi = malloc(sizeof(*sdi));
+    struct sound_device_input_t tmp = {.pcm_handle = pcm_handle};
+    memcpy(sdi, &tmp, sizeof(tmp));
     return sdi;
 }
 
-unsigned_frames_count capture(sound_device_input_t *sds, char * buffer, unsigned_frames_count frames){
+unsigned_frames_count capture(struct sound_device_input_t *sds, char * buffer, unsigned_frames_count frames){
     ssize_t pcm_capture_return;
     snd_pcm_t *pcm_handle = sds -> pcm_handle;
     //TODO: Do we need to clear the buffer in case of failure?
@@ -38,37 +38,37 @@ unsigned_frames_count capture(sound_device_input_t *sds, char * buffer, unsigned
         fprintf(stderr, "Buffer overrun! Details: %s\n", snd_strerror(pcm_capture_return));
         snd_pcm_prepare(pcm_handle);
     }
-    pcm_capture_return;
+    return pcm_capture_return;
 }
 
-void close_input(sound_device_input_t* sdi){
+void close_input(struct sound_device_input_t* sdi){
     snd_pcm_close(sdi -> pcm_handle);
     free(sdi);
 }
 //end capture
 
 //playback
-sound_device_output_t *open_output(const char* sd_name, sound_device_config_t* sd_cfg){
+struct sound_device_output_t *open_output(const char* sd_name, sound_device_config_t* sd_cfg){
     snd_pcm_t *pcm_handle;
-    _configure_device(&pcm_handle, sd_name, _playback, sd_cfg);
-    sound_device_output_t *sdo = malloc(sizeof(sdo));
-    sound_device_output_t tmp = {.pcm_handle = pcm_handle};
+    _configure_device(&pcm_handle, sd_name, playback_, sd_cfg);
+    struct sound_device_output_t *sdo = malloc(sizeof(sdo));
+    struct sound_device_output_t tmp = {.pcm_handle = pcm_handle};
     memcpy(sdo, &tmp, sizeof(tmp));
     return sdo;
 }
 
-unsigned_frames_count playback(sound_device_output_t *sds, char * buffer, unsigned_frames_count frames){
+unsigned_frames_count playback(struct sound_device_output_t *sds, char * buffer, unsigned_frames_count frames){
     ssize_t pcm_return;
     snd_pcm_t *pcm_handle = sds -> pcm_handle;
     //TODO: Probably in case of failure we need to playback another buffer, not this one
     while((pcm_return = snd_pcm_writei(pcm_handle, buffer, frames)) < 0){
-        fprintf(stderr, "Error while playing back. PCM device will be prepared. Error code = %d, details = %s\n", pcm_return, snd_strerror(pcm_return));
+        fprintf(stderr, "Error while playing back. PCM device will be prepared. Error code = %ld, details = %s\n", pcm_return, snd_strerror(pcm_return));
         snd_pcm_prepare(pcm_handle);
     }
     return pcm_return;
 }
 
-void close_output(sound_device_output_t* sdo){
+void close_output(struct sound_device_output_t* sdo){
     snd_pcm_close(sdo -> pcm_handle);
     free(sdo);
 }
@@ -78,10 +78,10 @@ static void _configure_device(snd_pcm_t **pcm_handle_ptr, const char *sd_name, e
     snd_pcm_hw_params_t *hwparams = NULL;
     snd_pcm_stream_t stream;
     switch(mode){
-        case _capture:
+        case capture_:
             stream = SND_PCM_STREAM_CAPTURE;
             break;
-        case _playback:
+        case playback_:
             stream = SND_PCM_STREAM_PLAYBACK;
             break;
         default:
@@ -122,7 +122,7 @@ static void _configure_device(snd_pcm_t **pcm_handle_ptr, const char *sd_name, e
 
     {
         int direction = 0;
-        int exact_rate = cfg -> rate;
+        unsigned int exact_rate = cfg -> rate;
         if((error_code = snd_pcm_hw_params_set_rate_near(pcm_handle, hwparams, &exact_rate, &direction)) < 0){
             fprintf(stderr, "Cannot set sample rate to %d. Details: %s\n", cfg -> rate, snd_strerror(error_code));
             return;

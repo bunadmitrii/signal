@@ -64,8 +64,8 @@ int main(int argc, char const *argv[])
     if(device == NULL || file_path == NULL)
         _print_usage_info_and_exit(argv[0]);
 
-    // struct connection_config_t *conn_config_ptr = allocate_local("/tmp/test_local_addr");
-    struct connection_config_t *conn_config_ptr = allocate_tcp("127.0.0.1", 5432, 16);
+    struct connection_config_t *conn_config_ptr = allocate_local("/tmp/test_local_addr");
+    // struct connection_config_t *conn_config_ptr = allocate_tcp("127.0.0.1", 5432, 16);
     struct application_config_t app_config = {
         .conn_config_ptr = conn_config_ptr,
         .mode = mode,
