@@ -18,12 +18,12 @@ struct sound_device_output_t{
     snd_pcm_t *const pcm_handle;
 };
 
-static void _configure_device(snd_pcm_t **pcm_handle_ptr, const char *sd, enum mode mode, sound_device_config_t* cfg);
+static void configure_device_(snd_pcm_t **pcm_handle_ptr, const char *sd, enum mode mode, struct sound_device_config_t* cfg);
 
 //capture
-struct sound_device_input_t *open_input(const char* sd, sound_device_config_t* sd_cfg){
+struct sound_device_input_t *open_input(const char* sd, struct sound_device_config_t* sd_cfg){
     snd_pcm_t *pcm_handle;
-    _configure_device(&pcm_handle, sd, capture_, sd_cfg);
+    configure_device_(&pcm_handle, sd, capture_, sd_cfg);
     struct sound_device_input_t *sdi = malloc(sizeof(*sdi));
     struct sound_device_input_t tmp = {.pcm_handle = pcm_handle};
     memcpy(sdi, &tmp, sizeof(tmp));
@@ -48,9 +48,9 @@ void close_input(struct sound_device_input_t* sdi){
 //end capture
 
 //playback
-struct sound_device_output_t *open_output(const char* sd_name, sound_device_config_t* sd_cfg){
+struct sound_device_output_t *open_output(const char* sd_name, struct sound_device_config_t* sd_cfg){
     snd_pcm_t *pcm_handle;
-    _configure_device(&pcm_handle, sd_name, playback_, sd_cfg);
+    configure_device_(&pcm_handle, sd_name, playback_, sd_cfg);
     struct sound_device_output_t *sdo = malloc(sizeof(sdo));
     struct sound_device_output_t tmp = {.pcm_handle = pcm_handle};
     memcpy(sdo, &tmp, sizeof(tmp));
@@ -74,7 +74,7 @@ void close_output(struct sound_device_output_t* sdo){
 }
 
 //TODO: replace void with error-code return type
-static void _configure_device(snd_pcm_t **pcm_handle_ptr, const char *sd_name, enum mode mode, sound_device_config_t* cfg){ 
+static void configure_device_(snd_pcm_t **pcm_handle_ptr, const char *sd_name, enum mode mode, struct sound_device_config_t* cfg){ 
     snd_pcm_hw_params_t *hwparams = NULL;
     snd_pcm_stream_t stream;
     switch(mode){

@@ -30,7 +30,7 @@ int run_application(struct application_config_t app_config){
     const char *const file_path = app_config.file_path;
     const char *const device = app_config.device_name;
 
-    sound_device_config_t *const cfg_ptr = config_allocate();
+    struct sound_device_config_t *const cfg_ptr = config_allocate();
     set_rate(cfg_ptr, 44100);
     set_channels(cfg_ptr, channels);
     set_sample_format(cfg_ptr, signed_16bit_little_endian);
