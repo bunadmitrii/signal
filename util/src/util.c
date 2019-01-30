@@ -1,5 +1,7 @@
 #include "util.h"
 
+#define ERROR_DESC_MAX_SIZE 256
+
 struct error_t{
     int error_code;
     unsigned int line;

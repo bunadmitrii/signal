@@ -15,7 +15,7 @@ add_subdirectory(net)
 include_directories("${PROJECT_SOURCE_DIR}/sound/include")
 add_subdirectory(sound)
 
-add_executable(bin.out main.c application.c)
+add_executable(bin.out main.c application.c apperrors.c)
 target_link_libraries(bin.out sound)
 target_link_libraries(bin.out net)
 target_link_libraries(bin.out asound)

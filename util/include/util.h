@@ -7,8 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ERROR_DESC_MAX_SIZE 256
-
 struct error_t;
 
 #define ERROR_SET(error_ptr, error_code, ...) error_set_(error_ptr, error_code, __LINE__, __FILE__, __func__, __VA_ARGS__)

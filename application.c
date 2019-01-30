@@ -39,8 +39,8 @@ int run_application(struct application_config_t app_config){
 
     const size_t frame_size = get_frame_size(cfg_ptr);
     const size_t buffer_frames = period_size;
-    char *const buffer = calloc(frame_size, buffer_frames);
-
+    char *const buffer = calloc(frame_size, buffer_frames); 
+   
     switch(mode){
         case record: {
             struct server_endpoint_t *srv_endpoint_ptr = initialize_server_endpoint(app_config.conn_config_ptr, &error);
@@ -48,7 +48,7 @@ int run_application(struct application_config_t app_config){
                 while(1){
                     struct connection_t *connection_ptr = await_connection(srv_endpoint_ptr, &error);
 
-                    struct sound_device_input_t *input = open_input(device, cfg_ptr);
+                    struct sound_device_input_t *input = open_input(device, cfg_ptr, &error);
                     int fd = open(file_path, O_WRONLY | O_EXCL | O_CREAT, S_IRUSR);
                     //TODO: We should release all the resources properly in case the file cannot be opened
                     if(fd <= 0){
@@ -61,7 +61,7 @@ int run_application(struct application_config_t app_config){
                     }
                     //TODO: Currently error is not set. This may cause application to work incorrectly
                     while(error == NULL){
-                        unsigned_frames_count frames_captured = capture(input, buffer, period_size);
+                        unsigned_frames_count frames_captured = capture(input, buffer, period_size, &error);
                         printf("Captured %lu frames. Writing to file...\n", frames_captured);
                         printf("Data captured: %s\n", buffer);
                         send_data(connection_ptr, buffer, buffer_frames * frame_size, &error);
@@ -70,7 +70,7 @@ int run_application(struct application_config_t app_config){
                     }
                     fprintf(stderr, "Error occured while transferring data\n");
                     print_error_msg(error, stderr);
-                    close_input(input);
+                    close_input(input, &error);
                     close_client_endpoint(connection_ptr -> client_endpoint_ptr, &error); 
                     clear_error(&error);
                 }
@@ -86,15 +86,15 @@ int run_application(struct application_config_t app_config){
                 fprintf(stderr, "Error while opening %s. Error code: %d, details: %s\n", file_path, errno, strerror(errno));
                 return 1;
             }
-            struct sound_device_output_t *output = open_output(device, cfg_ptr);
+            struct sound_device_output_t *output = open_output(device, cfg_ptr, &error);
             ssize_t bytes_read = read(fd, buffer, buffer_frames * frame_size);
             while(bytes_read > 0){
                 printf("Bytes read from %s: %ld\n", file_path, bytes_read);
-                unsigned_frames_count frames_played_back = playback(output, buffer, buffer_frames);
+                unsigned_frames_count frames_played_back = playback(output, buffer, buffer_frames, &error);
                 printf("Frames played back: %lu\n", frames_played_back);
                 bytes_read = read(fd, buffer, buffer_frames * frame_size);
             }
-            close_output(output);
+            close_output(output, &error);
         }
     }
     free(buffer);

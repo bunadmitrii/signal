@@ -11,6 +11,7 @@
 
 #include "local_endpoint.h"
 #include "util.h"
+#include "neterr.h"
 #include "net.h"
 
 struct server_endpoint_t* create_local_endpoint_(struct local_conf_t local_conf, struct error_t** thrown){

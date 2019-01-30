@@ -1,10 +1,3 @@
-//for string.h::strdup to be available
-#ifdef __STDC_ALLOC_LIB__
-#define __STDC_WANT_LIB_EXT2__ 1
-#else
-#define _POSIX_C_SOURCE 200809L
-#endif
-
 #include <string.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -16,6 +9,7 @@
 #include <sys/socket.h>
 
 #include "net.h"
+#include "neterr.h"
 #include "util.h"
 
 #include "internal/config_internal.h"

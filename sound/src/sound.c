@@ -18,19 +18,18 @@ struct sound_device_output_t{
     snd_pcm_t *const pcm_handle;
 };
 
-static void configure_device_(snd_pcm_t **pcm_handle_ptr, const char *sd, enum mode mode, struct sound_device_config_t* cfg);
+static snd_pcm_t* configure_device_(const char *sd, enum mode mode, struct sound_device_config_t* cfg, struct error_t **thrown);
 
 //capture
-struct sound_device_input_t *open_input(const char* sd, struct sound_device_config_t* sd_cfg){
-    snd_pcm_t *pcm_handle;
-    configure_device_(&pcm_handle, sd, capture_, sd_cfg);
+struct sound_device_input_t *open_input(const char* sd, struct sound_device_config_t* sd_cfg, struct error_t **thrown){
+    snd_pcm_t *pcm_handle = configure_device_(sd, capture_, sd_cfg, thrown);
     struct sound_device_input_t *sdi = malloc(sizeof(*sdi));
     struct sound_device_input_t tmp = {.pcm_handle = pcm_handle};
     memcpy(sdi, &tmp, sizeof(tmp));
     return sdi;
 }
 
-unsigned_frames_count capture(struct sound_device_input_t *sds, char * buffer, unsigned_frames_count frames){
+unsigned_frames_count capture(struct sound_device_input_t *sds, char * buffer, unsigned_frames_count frames, struct error_t **thrown){
     ssize_t pcm_capture_return;
     snd_pcm_t *pcm_handle = sds -> pcm_handle;
     //TODO: Do we need to clear the buffer in case of failure?
@@ -41,23 +40,27 @@ unsigned_frames_count capture(struct sound_device_input_t *sds, char * buffer, u
     return pcm_capture_return;
 }
 
-void close_input(struct sound_device_input_t* sdi){
-    snd_pcm_close(sdi -> pcm_handle);
+void close_input(struct sound_device_input_t* sdi, struct error_t **thrown){
+    char* pcm_name = strdup(snd_pcm_name(sdi -> pcm_handle));
+    int result = snd_pcm_close(sdi -> pcm_handle);
+    if(result != 0)
+        fprintf(stderr, "Cannot close pcm handle %s. Error code = %d, details = %s\n", pcm_name, result, snd_strerror(result));
     free(sdi);
+    free(pcm_name);
 }
 //end capture
 
 //playback
-struct sound_device_output_t *open_output(const char* sd_name, struct sound_device_config_t* sd_cfg){
-    snd_pcm_t *pcm_handle;
-    configure_device_(&pcm_handle, sd_name, playback_, sd_cfg);
+struct sound_device_output_t *open_output(const char* sd_name, struct sound_device_config_t* sd_cfg, struct error_t **thrown){
+    snd_pcm_t *pcm_handle = configure_device_(sd_name, playback_, sd_cfg, thrown);
+    struct sound_device_input_t *sdi = malloc(sizeof(*sdi));
     struct sound_device_output_t *sdo = malloc(sizeof(sdo));
     struct sound_device_output_t tmp = {.pcm_handle = pcm_handle};
     memcpy(sdo, &tmp, sizeof(tmp));
     return sdo;
 }
 
-unsigned_frames_count playback(struct sound_device_output_t *sds, char * buffer, unsigned_frames_count frames){
+unsigned_frames_count playback(struct sound_device_output_t *sds, char * buffer, unsigned_frames_count frames, struct error_t **thrown){
     ssize_t pcm_return;
     snd_pcm_t *pcm_handle = sds -> pcm_handle;
     //TODO: Probably in case of failure we need to playback another buffer, not this one
@@ -68,14 +71,19 @@ unsigned_frames_count playback(struct sound_device_output_t *sds, char * buffer,
     return pcm_return;
 }
 
-void close_output(struct sound_device_output_t* sdo){
-    snd_pcm_close(sdo -> pcm_handle);
+void close_output(struct sound_device_output_t* sdo, struct error_t **thrown){
+    char *pcm_name = strdup(snd_pcm_name(sdo -> pcm_handle));
+    int result = snd_pcm_close(sdo -> pcm_handle);
+    if(result != 0)
+        fprintf(stderr, "Cannot close pcm handle %s. Error code = %d, details = %s\n", pcm_name, result, snd_strerror(result));
     free(sdo);
+    free(pcm_name);
 }
 
 //TODO: replace void with error-code return type
-static void configure_device_(snd_pcm_t **pcm_handle_ptr, const char *sd_name, enum mode mode, struct sound_device_config_t* cfg){ 
+static snd_pcm_t* configure_device_(const char *sd_name, enum mode mode, struct sound_device_config_t* cfg, struct error_t** thrown){ 
     snd_pcm_hw_params_t *hwparams = NULL;
+    snd_pcm_t *pcm_handle = NULL;
     snd_pcm_stream_t stream;
     switch(mode){
         case capture_:
@@ -86,21 +94,19 @@ static void configure_device_(snd_pcm_t **pcm_handle_ptr, const char *sd_name, e
             break;
         default:
             fprintf(stderr, "Unknown stream mode\n");
-            return;
+            return NULL;
     }
     snd_pcm_hw_params_alloca(&hwparams);
     const char * device_name = sd_name;
     
     int error_code;
 
-    if((error_code = snd_pcm_open(pcm_handle_ptr, device_name, stream, 0)) < 0){
+    if((error_code = snd_pcm_open(&pcm_handle, device_name, stream, 0)) < 0){
         fprintf(stderr, "Cannot open pcm device with name %s. Details: %s\n", device_name, snd_strerror(error_code));
-        return;
+        return NULL;
     } else {
         printf("Pcm device %s opened\n", device_name);
     }
-
-    snd_pcm_t *pcm_handle = *pcm_handle_ptr;
 
     if((error_code = snd_pcm_hw_params_any(pcm_handle, hwparams)) < 0){
         fprintf(stderr, "Cannot initialize hwparams with full configuration space. Details: %s\n", snd_strerror(error_code));
@@ -125,7 +131,7 @@ static void configure_device_(snd_pcm_t **pcm_handle_ptr, const char *sd_name, e
         unsigned int exact_rate = cfg -> rate;
         if((error_code = snd_pcm_hw_params_set_rate_near(pcm_handle, hwparams, &exact_rate, &direction)) < 0){
             fprintf(stderr, "Cannot set sample rate to %d. Details: %s\n", cfg -> rate, snd_strerror(error_code));
-            return;
+            return NULL;
         } else if(exact_rate != cfg -> rate) {
             printf("Exact rate %d differs from the rate configured %d\n", exact_rate, cfg -> rate);
         } else {
@@ -135,14 +141,14 @@ static void configure_device_(snd_pcm_t **pcm_handle_ptr, const char *sd_name, e
 
     if((error_code = snd_pcm_hw_params_set_channels(pcm_handle, hwparams, cfg -> channels)) < 0){
         fprintf(stderr, "Cannot set the number of channels to %d. Details: %s", cfg -> channels, snd_strerror(error_code));
-        return;
+        return NULL;
     } else {
         printf("Number of channels is set to %d\n", cfg -> channels);
     }
 
     if((error_code = snd_pcm_hw_params_set_periods(pcm_handle, hwparams, cfg -> periods, 0)) < 0){
          fprintf(stderr, "Cannot set periods to %d. Details: %s\n", cfg -> periods, snd_strerror(error_code));
-         return;
+         return NULL;
     } else {
         printf("Periods is set to %d\n", cfg -> periods);
     }
@@ -151,7 +157,7 @@ static void configure_device_(snd_pcm_t **pcm_handle_ptr, const char *sd_name, e
         const int buffer_size = cfg -> period_size * cfg -> periods;
         if((error_code = snd_pcm_hw_params_set_buffer_size(pcm_handle, hwparams, buffer_size)) < 0){
             fprintf(stderr, "Cannot set buffer size to %d frames. Details: %s\n", buffer_size, snd_strerror(error_code));
-            return;
+            return NULL;
         } else {
             printf("Buffer size is set to %d periods\n", buffer_size);
         }
@@ -159,8 +165,9 @@ static void configure_device_(snd_pcm_t **pcm_handle_ptr, const char *sd_name, e
 
     if((error_code = snd_pcm_hw_params(pcm_handle, hwparams)) < 0){
         fprintf(stderr, "Cannot set the configured params. Details: %s\n", snd_strerror(error_code));
-        return;
+        return NULL;
     } else {
         printf("Params are successfully applied to the pcm device\n");
     }
+    return pcm_handle;
 }

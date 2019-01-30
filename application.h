@@ -10,6 +10,14 @@ enum mode {
     play 
 };
 
+enum application_error_codes {
+    server_initialization_error = 1,
+    connection_failure,
+    closing_client_error,
+    data_transfer_error,
+    closing_server_error
+};
+
 struct application_config_t{
     struct connection_config_t *conn_config_ptr;
     const enum mode mode;
