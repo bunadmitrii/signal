@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 #include "config.h"
 #include "internal/types.h"
 
@@ -17,7 +19,7 @@ void set_periods(struct sound_device_config_t *config, unsigned int periods){
     config -> periods = periods;
 }
 
-void set_period_size(struct sound_device_config_t *config, unsigned_frames_count period_size){
+void set_period_size(struct sound_device_config_t *config, size_t period_size){
     config -> period_size = period_size;
 }
 
@@ -36,6 +38,10 @@ void set_sample_format(struct sound_device_config_t *config, enum sample_format 
     }
 }
 
+void set_device_name(struct sound_device_config_t *config, const char *device_name){
+    config -> device_name = device_name;
+}
+
 ssize_t get_frame_size(struct sound_device_config_t * config){
     ssize_t frame_size;
     switch(config -> sample_format){
@@ -51,4 +57,9 @@ ssize_t get_frame_size(struct sound_device_config_t * config){
         return config -> channels * frame_size;
     else 
         return -1;
+}
+
+
+size_t get_period_size(struct sound_device_config_t *config){
+    return config -> period_size;
 }

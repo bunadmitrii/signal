@@ -11,7 +11,7 @@ struct sound_device_input_t;
 struct sound_device_output_t;
 
 //capture
-struct sound_device_input_t *open_input(const char*, struct sound_device_config_t*, struct error_t**);
+struct sound_device_input_t *open_input(struct sound_device_config_t*, struct error_t**);
 
 unsigned_frames_count capture(struct sound_device_input_t *sds, char * buffer, unsigned_frames_count frames, struct error_t**);
 
@@ -19,7 +19,7 @@ unsigned_frames_count capture(struct sound_device_input_t *sds, char * buffer, u
 void close_input(struct sound_device_input_t*, struct error_t**);
 
 //playback
-struct sound_device_output_t *open_output(const char*, struct sound_device_config_t*, struct error_t**);
+struct sound_device_output_t *open_output(struct sound_device_config_t*, struct error_t**);
 
 unsigned_frames_count playback(struct sound_device_output_t *sds, char * buffer, unsigned_frames_count frames, struct error_t**);
 

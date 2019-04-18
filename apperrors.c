@@ -11,3 +11,4 @@ const int close_sound_output_error = 7;
 const int unknown_sound_mode_error = 8;
 const int sound_endpoint_opening_error = 9;
 const int sound_param_set_error = 10;
+const int stopping_not_running_app_error = 11;

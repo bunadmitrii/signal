@@ -9,17 +9,21 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
-#include <alsa/asoundlib.h>
+#include <unistd.h>
+#include <stdatomic.h>
 #include <sys/fcntl.h>
 
-#include "net.h"
-#include "sound.h"
 #include "application.h"
+
+static application * _Atomic app_ptr = NULL; //TODO: Atomic?
 
 static const char *const PLAYBACK = "P";
 static const char *const CAPTURE = "C";
+static const size_t period_size = 2048;
+static const uint16_t channels = 2;
+static const uint16_t periods = 2;
 
-static void _print_usage_info_and_exit(const char *);
+static void print_usage_info_and_exit_(const char *);
 //TODO: Compile command is not being used for vscode. Sometimes re-creating it by hands helps
 
 //!!!!!TODO:!!!!! How to force a compiler to emit warning in case a enumeration constant of one enum type is assigned to another?
@@ -32,9 +36,11 @@ static void _print_usage_info_and_exit(const char *);
 //TODO: DISPLAY warnings IN THE PROBLEMS PANEL
 
 //TODO: Ctrl+B does not work properly when terminal focus is on
+
+//TODO: In case we open a new editor group (e.g. with Ctrl+2) what shortcut closes the currently active group?
 int main(int argc, char const *argv[])
 {
-    enum { record, play } mode;
+    enum mode mode;
     const char *device = NULL;
     const char *file_path = NULL;
     int opt;
@@ -57,26 +63,40 @@ int main(int argc, char const *argv[])
                 file_path = strdup(optarg);
                 break;
             default:
-                _print_usage_info_and_exit(argv[0]);
+                print_usage_info_and_exit_(argv[0]);
        }
     }
 
     if(device == NULL || file_path == NULL)
-        _print_usage_info_and_exit(argv[0]);
+        print_usage_info_and_exit_(argv[0]);
 
-    // struct connection_config_t *conn_config_ptr = allocate_local("/tmp/test_local_addr");
-    struct connection_config_t *conn_config_ptr = allocate_tcp("127.0.0.1", 5432, 16);
-    struct application_config_t app_config = {
-        .conn_config_ptr = conn_config_ptr,
-        .mode = mode,
-        .device_name = device,
-        .file_path = file_path
-    };
-    int exit_status = run_application(app_config);
+    struct application_config *config_ptr = application_config_allocate();
+    application_set_tcp_communication(config_ptr, "127.0.0.1", 5432, 16);
+    application_set_snd_dev_name(config_ptr, device);
+    application_set_snd_mode(config_ptr, mode);
+    application_set_file_path(config_ptr, file_path);
+    application_set_rate(config_ptr, 44100);
+    application_set_channels(config_ptr, channels);
+    enum app_snd_sample_rate rate = app_signed_16bit_little_endian;
+    if(application_set_sample_format(config_ptr, rate) == -1){
+        fprintf(stderr, "Configuration error. %d sample format is not supported\n", rate);
+        exit(EXIT_FAILURE);
+    }
+    application_set_periods(config_ptr, periods);
+    application_set_perios_size(config_ptr, period_size);
+    //TODO: How to pass atomic pointer to a function?
+    int exit_status = run_application(config_ptr, &app_ptr);
+    application_config_release(config_ptr);
+    //TODO: Stopping application which might be already stopped
+    stop_application(&app_ptr);
+    //TODO: We called stop_application which releases the object 
+    //TODO: pointed to by app_ptr so we need to set the pointer to NULL
+    //TODO: This is extremely weird and must be refactored
+    app_ptr = NULL;
     printf("Application exited. Exit code = %d\n", exit_status);
 }
 
-static void _print_usage_info_and_exit(const char * binary_name){
+static void print_usage_info_and_exit_(const char * binary_name){
     fprintf(stderr, "Usage: %s [-d pcm_device_name] [-m [P]layback | [C]apture] [-f filepath]\n", binary_name);
     exit(1);
 }

@@ -19,11 +19,11 @@ struct sound_device_output_t{
     snd_pcm_t *const pcm_handle;
 };
 
-static snd_pcm_t* configure_device_(const char *sd, enum mode mode, struct sound_device_config_t* cfg, struct error_t **thrown);
+static snd_pcm_t* configure_device_(enum mode mode, struct sound_device_config_t* cfg, struct error_t **thrown);
 
 //capture
-struct sound_device_input_t *open_input(const char* sd, struct sound_device_config_t* sd_cfg, struct error_t **thrown){
-    snd_pcm_t *pcm_handle = configure_device_(sd, capture_, sd_cfg, thrown);
+struct sound_device_input_t *open_input(struct sound_device_config_t* sd_cfg, struct error_t **thrown){
+    snd_pcm_t *pcm_handle = configure_device_(capture_, sd_cfg, thrown);
     struct sound_device_input_t *sdi = malloc(sizeof(*sdi));
     struct sound_device_input_t tmp = {.pcm_handle = pcm_handle};
     memcpy(sdi, &tmp, sizeof(tmp));
@@ -52,8 +52,8 @@ void close_input(struct sound_device_input_t* sdi, struct error_t **thrown){
 //end capture
 
 //playback
-struct sound_device_output_t *open_output(const char* sd_name, struct sound_device_config_t* sd_cfg, struct error_t **thrown){
-    snd_pcm_t *pcm_handle = configure_device_(sd_name, playback_, sd_cfg, thrown);
+struct sound_device_output_t *open_output(struct sound_device_config_t* sd_cfg, struct error_t **thrown){
+    snd_pcm_t *pcm_handle = configure_device_(playback_, sd_cfg, thrown);
     struct sound_device_input_t *sdi = malloc(sizeof(*sdi));
     struct sound_device_output_t *sdo = malloc(sizeof(sdo));
     struct sound_device_output_t tmp = {.pcm_handle = pcm_handle};
@@ -82,7 +82,8 @@ void close_output(struct sound_device_output_t* sdo, struct error_t **thrown){
 }
 
 //TODO: replace void with error-code return type
-static snd_pcm_t* configure_device_(const char *sd_name, enum mode mode, struct sound_device_config_t* cfg, struct error_t** thrown){ 
+static snd_pcm_t* configure_device_(enum mode mode, struct sound_device_config_t* cfg, struct error_t** thrown){ 
+    const char *const sd_name = cfg -> device_name;
     snd_pcm_hw_params_t *hwparams = NULL;
     snd_pcm_t *pcm_handle = NULL;
     snd_pcm_stream_t stream;
