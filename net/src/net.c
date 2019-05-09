@@ -59,20 +59,20 @@ struct server_impl_t{
 static struct client_t* net_await_client(struct server_t *srv_endpoint_ptr, struct error_t **thrown){
     const struct server_impl_t *srv_ptr = (const struct server_impl_t*) srv_endpoint_ptr;
     const int server_sock_fd = srv_ptr -> server_socket_fd;
-    struct sockaddr *peer_address = NULL;
     socklen_t peer_addrlen = 0;
     struct client_t *client_ptr = malloc(sizeof(*client_ptr));
     client_ptr -> type = srv_ptr -> type;
+    struct sockaddr *peer_address = NULL;
     if(srv_ptr -> type == local){
         peer_address = malloc(sizeof(struct sockaddr_un));
         peer_addrlen = sizeof(struct sockaddr_un);
     } else if(srv_ptr -> type == tcp){
         peer_address = malloc(sizeof(struct sockaddr_in));
-        peer_addrlen = sizeof(struct sockaddr_in);
+        peer_addrlen = (socklen_t) sizeof(struct sockaddr_in);
     }
     printf("Waiting for connection... ");
     fflush(stdout);
-    int peer_fd = accept(server_sock_fd, (struct sockaddr *) &peer_address, &peer_addrlen);
+    int peer_fd = accept(server_sock_fd, (struct sockaddr *) peer_address, &peer_addrlen);
     if(peer_fd == -1){
         ERROR_SET(thrown, connection_failure, "Peer connection error on server socker fd = %d. Error code = %d, details = %s", server_sock_fd, errno, strerror(errno));
         return NULL;
@@ -89,6 +89,10 @@ static struct client_t* net_await_client(struct server_t *srv_endpoint_ptr, stru
 static void net_shutdown_server(struct server_t *server_ptr, struct error_t ** thrown){
     printf("Shutting down server...");
     fflush(stdout);
+    if(!server_ptr){
+        printf("Server is NULL. Nothing to shutdown.\n");
+        return;
+    }
     struct server_impl_t *server_impl_ptr = (struct server_impl_t*) server_ptr; 
     const int server_socket_fd = server_impl_ptr -> server_socket_fd;
     const enum connection_type type = server_impl_ptr -> type;
@@ -120,6 +124,10 @@ static void net_shutdown_server(struct server_t *server_ptr, struct error_t ** t
 }
 
 void net_close_client(struct client_t *client_ptr, struct error_t **thrown){
+    if(!client_ptr){
+        printf("Client is NULL. Nothing to close.\n");
+        return;
+    }
     int close_result = close(client_ptr -> client_fd);
     if(close_result == -1)
         ERROR_SET(
@@ -202,10 +210,12 @@ struct connection_config_t *net_allocate_config(){
 void net_set_local_communication(struct connection_config_t* config_ptr, const char *local_address){
     //TODO: Doesn't it cause UB if I assign to a member of a member of a union,
     //TODO: not to a member of union itself
+    config_ptr -> type = local;
     config_ptr -> conf.local_conf.local_address = local_address;
 }
 
 void net_set_tcp_communication(struct connection_config_t* config_ptr, const char *hostname, uint16_t port, int backlog){
+    config_ptr -> type = tcp;
     config_ptr -> conf.tcp_conf.hostname = hostname;
     config_ptr -> conf.tcp_conf.port = port;
     config_ptr -> conf.tcp_conf.backlog = backlog;
