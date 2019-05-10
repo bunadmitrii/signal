@@ -31,6 +31,7 @@ struct sound_device_input_t *open_input(struct sound_device_config_t* sd_cfg, st
 }
 
 unsigned_frames_count capture(struct sound_device_input_t *sds, char * buffer, unsigned_frames_count frames, struct error_t **thrown){
+    (void) thrown;
     ssize_t pcm_capture_return;
     snd_pcm_t *pcm_handle = sds -> pcm_handle;
     //TODO: Do we need to clear the buffer in case of failure?
@@ -42,6 +43,10 @@ unsigned_frames_count capture(struct sound_device_input_t *sds, char * buffer, u
 }
 
 void close_input(struct sound_device_input_t* sdi, struct error_t **thrown){
+    if(!sdi){
+        fprintf(stderr, "Sound device input is NULL. Nothing to close\n");
+        return;
+    }
     char* pcm_name = strdup(snd_pcm_name(sdi -> pcm_handle));
     int result = snd_pcm_close(sdi -> pcm_handle);
     free(sdi);
@@ -62,6 +67,7 @@ struct sound_device_output_t *open_output(struct sound_device_config_t* sd_cfg, 
 }
 
 unsigned_frames_count playback(struct sound_device_output_t *sds, char * buffer, unsigned_frames_count frames, struct error_t **thrown){
+    (void) thrown;
     ssize_t pcm_return;
     snd_pcm_t *pcm_handle = sds -> pcm_handle;
     //TODO: Probably in case of failure we need to playback another buffer, not this one
