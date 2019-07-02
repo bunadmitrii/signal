@@ -60,7 +60,7 @@ static struct client_t* net_await_client(struct server_t *srv_endpoint_ptr, stru
     const struct server_impl_t *srv_ptr = (const struct server_impl_t*) srv_endpoint_ptr;
     const int server_sock_fd = srv_ptr -> server_socket_fd;
     socklen_t peer_addrlen = 0;
-    struct client_t *client_ptr = malloc(sizeof(*client_ptr));
+    struct client_t *client_ptr = malloc(sizeof *client_ptr);
     client_ptr -> type = srv_ptr -> type;
     struct sockaddr *peer_address = NULL;
     if(srv_ptr -> type == local){

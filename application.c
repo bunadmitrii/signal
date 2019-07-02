@@ -33,7 +33,6 @@ struct application{
     struct server_t *server_ptr;
     //TODO: Consider moving it into sound.h
     enum mode mode;
-    int signal_flush_fd;
     union {
         struct sound_device_input_t *input;
         struct sound_device_output_t *output;
@@ -162,19 +161,6 @@ int run_application(const application_config_t *app_config, struct application *
     app_ptr -> server_ptr = NULL;
     app_ptr -> mode = app_config -> mode;
     const char *const file_path = app_config -> file_path;
-    //TODO: Duplicate mode usage. Mode is used for opening sound_device_input/output
-    switch (app_ptr -> mode)
-    {
-        case record:
-            app_ptr -> signal_flush_fd = open(file_path, O_WRONLY | O_EXCL | O_CREAT, S_IRUSR);
-            break;
-        case play:
-            app_ptr -> signal_flush_fd = open(file_path, O_RDONLY);
-            break;
-        default:
-            fprintf(stderr, "Unknown mode: %d", app_ptr -> mode);
-            return -1; //TODO
-    }
     //TODO: This is a really weird way of error handling
     struct error_t *error_ptr = NULL;
     app_ptr -> server_ptr = net_initialize_server_endpoint(app_config -> conn_cfg_ptr, &error_ptr);
@@ -186,6 +172,7 @@ int run_application(const application_config_t *app_config, struct application *
     atomic_store_explicit(atomic_app_ptr, app_ptr, memory_order_release);
 
     struct sound_device_config_t *snd_cfg_ptr = app_config -> snd_cfg_ptr;
+    //frames_count = get_frame_size. WTF?
     const size_t frames_count = get_frame_size(snd_cfg_ptr);
     const size_t frame_size = get_period_size(snd_cfg_ptr);
     const size_t period_size = frames_count * frame_size;
@@ -197,9 +184,9 @@ int run_application(const application_config_t *app_config, struct application *
         case record: {
             if(error_ptr == NULL){
                 while(1){
-                    struct server_t *srv_ptr = app_ptr -> server_ptr;
+                    struct server_t *srv_ptr = app_ptr->server_ptr;
                     //TODO: Probably we need some status to avoid stopping app/awaiting client race
-                    struct client_t *client_ptr = srv_ptr -> await_client(srv_ptr, &error_ptr);
+                    struct client_t *client_ptr = srv_ptr->await_client(srv_ptr, &error_ptr);
 
                     struct sound_device_input_t *input = open_input(snd_cfg_ptr, &error_ptr);
                     int fd = open(file_path, O_WRONLY | O_EXCL | O_CREAT, S_IRUSR);
@@ -213,9 +200,9 @@ int run_application(const application_config_t *app_config, struct application *
                         return 1;
                     }
                     while(error_ptr == NULL){
-                        unsigned_frames_count frames_captured = capture(input, buffer, period_size, &error_ptr);
+                        unsigned_frames_count frames_captured = capture(input, buffer, frames_count, &error_ptr);
                         printf("Captured %lu frames. Writing to file...\n", frames_captured);
-                        printf("Data captured: %s\n", buffer);
+                        // printf("Data captured: %s\n", buffer);
                         net_send_data(client_ptr, buffer, period_size, &error_ptr);
                         ssize_t written = write(fd, buffer, period_size);
                         printf("Written %ld bytes to file\n", written);
